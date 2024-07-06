@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, jsonify
+import requests
+from bs4 import BeautifulSoup
 
 app = FastAPI()
 
@@ -6,40 +8,23 @@ app = FastAPI()
 async def root():
     return {"greeting": "Hello, World!", "message": "Welcome to FastAPI Quive Edition!"}
 
-import logging
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
-# Set up logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
+@app.route('/links', methods=['GET'])
+def get_pdf_links():
+    url = "https://dpsranchi.com/question_answer_paper.html"
+    response = requests.get(url)
 
-# Replace 'YOUR_BOT_TOKEN' with your bot's token obtained from BotFather
-TOKEN = '6542526835:AAFwgr-MhkkP5lIMJf4gpnEgzxfWMw5oxBk'
+    if response.status_code == 200:
+        html_content = response.text
+    else:
+        return jsonify({"error": "Failed to retrieve webpage"}), 500
 
-# Define a function to handle the /start command
-def start(update, context):
-    context.bot.send_message(chat_id=update.effective_chat.id, text="Hello! I'm your new bot.")
+    soup = BeautifulSoup(html_content, 'html.parser')
 
-# Define a function to handle text messages
-def echo(update, context):
-    context.bot.send_message(chat_id=update.effective_chat.id, text=update.message.text)
+    pdf_links = []
+    for link in soup.find_all('a'):
+        href = link.get('href')
+        if href and href.endswith('.pdf'):
+            pdf_links.append(href)
 
-def main():
-    # Create the Updater and pass it your bot's token
-    updater = Updater(TOKEN, use_context=True)
-
-    # Get the dispatcher to register handlers
-    dp = updater.dispatcher
-
-    # Add handlers for different commands and messages
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
-
-    # Start the Bot
-    updater.start_polling()
-
-    # Run the bot until you press Ctrl-C or the process receives SIGINT, SIGTERM or SIGABRT
-    updater.idle()
-
-if __name__ == '__main__':
-    main()
+    return jsonify({"pdf_links": pdf_links})
